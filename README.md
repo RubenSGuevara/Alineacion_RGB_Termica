@@ -1,70 +1,129 @@
-# Getting Started with Create React App
+# Registro RGB-Térmica con TPS
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Aplicación web para registro y alineación de imágenes RGB y térmicas usando Transformaciones Thin-Plate Splines (TPS).
 
-## Available Scripts
+## 🚀 Características
 
-In the project directory, you can run:
+- ✅ Carga de imágenes RGB y térmicas
+- ✅ Marcado interactivo de puntos de control
+- ✅ Registro no rígido usando TPS
+- ✅ Visualización con superposición ajustable
+- ✅ Interfaz moderna con Tailwind CSS
+- ✅ Procesamiento en el cliente usando OpenCV.js
 
-### `npm start`
+## 🛠️ Tecnologías
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **React 19** - Biblioteca de UI
+- **Vite** - Build tool y dev server
+- **Tailwind CSS** - Estilos
+- **OpenCV.js** - Procesamiento de imágenes
+- **Lucide React** - Iconos
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 📦 Instalación
 
-### `npm test`
+```bash
+npm install
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 🏃 Desarrollo
 
-### `npm run build`
+```bash
+npm run dev
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+La aplicación estará disponible en `http://localhost:5173`
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🏗️ Build para Producción
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+npm run build
+```
 
-### `npm run eject`
+Los archivos optimizados se generarán en la carpeta `dist/`
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🌐 Despliegue en Vercel
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Opción 1: Despliegue desde GitHub (Recomendado)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+1. **Sube tu código a GitHub:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin <tu-repositorio-github>
+   git push -u origin main
+   ```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+2. **Conecta con Vercel:**
+   - Ve a [vercel.com](https://vercel.com)
+   - Haz clic en "Add New Project"
+   - Selecciona tu repositorio de GitHub
+   - Vercel detectará automáticamente que es un proyecto Vite
+   - Configuración recomendada:
+     - **Framework Preset:** Vite
+     - **Build Command:** `npm run build` (automático)
+     - **Output Directory:** `dist` (automático)
+     - **Install Command:** `npm install` (automático)
+   - Haz clic en "Deploy"
 
-## Learn More
+3. **¡Listo!** Tu aplicación estará en línea en menos de 2 minutos
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Opción 2: Despliegue con Vercel CLI
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+1. **Instala Vercel CLI:**
+   ```bash
+   npm i -g vercel
+   ```
 
-### Code Splitting
+2. **Despliega:**
+   ```bash
+   vercel
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+3. **Para producción:**
+   ```bash
+   vercel --prod
+   ```
 
-### Analyzing the Bundle Size
+### Configuración Automática
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+El archivo `vercel.json` ya está configurado con:
+- ✅ Detección automática de Vite
+- ✅ Rewrites para SPA (Single Page Application)
+- ✅ Headers de caché optimizados para OpenCV.js y assets
 
-### Making a Progressive Web App
+## 📝 Notas de Despliegue
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- **OpenCV.js:** Se carga desde CDN externo (`docs.opencv.org`), por lo que necesita conexión a internet
+- **Tamaño del bundle:** OpenCV.js es grande (~8MB), pero se carga de forma asíncrona
+- **Build time:** El build normalmente toma 1-2 minutos en Vercel
 
-### Advanced Configuration
+## 🐛 Solución de Problemas
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### El build falla en Vercel
+- Verifica que `package.json` tenga el script `build`
+- Asegúrate de que todas las dependencias estén listadas en `dependencies` o `devDependencies`
 
-### Deployment
+### OpenCV.js no carga
+- Verifica la conexión a internet
+- Revisa la consola del navegador para errores de carga
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### Rutas no funcionan
+- El archivo `vercel.json` incluye rewrites para SPA. Si cambias rutas, actualiza las rewrites.
 
-### `npm run build` fails to minify
+## 📄 Scripts Disponibles
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `npm run dev` - Inicia servidor de desarrollo
+- `npm run build` - Construye para producción
+- `npm run preview` - Previsualiza el build de producción localmente
+
+## 📚 Documentación Adicional
+
+- [Documentación de Vite](https://vitejs.dev/)
+- [Documentación de React](https://react.dev/)
+- [Documentación de Vercel](https://vercel.com/docs)
+- [OpenCV.js](https://docs.opencv.org/4.5.2/opencv.js-docs/)
+
+## 📝 Licencia
+
+Este proyecto es de uso educativo y de investigación.
