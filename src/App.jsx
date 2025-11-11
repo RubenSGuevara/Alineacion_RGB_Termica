@@ -1,7 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, RotateCcw, Download, Play, Eye, EyeOff, Info, AlertCircle } from 'lucide-react';
+import { RotateCcw, Download, Play, Eye, EyeOff, Info, AlertCircle, Lock, Check } from 'lucide-react';
+import { supabase, getPublicUrl } from './lib/supabase';
 
 const TPSImageRegistration = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accessCode, setAccessCode] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [lungPairs, setLungPairs] = useState([]);
+  const [selectedPair, setSelectedPair] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [rgbImage, setRgbImage] = useState(null);
   const [thermalImage, setThermalImage] = useState(null);
   const [rgbPoints, setRgbPoints] = useState([]);
@@ -41,6 +48,84 @@ const TPSImageRegistration = () => {
     return () => clearInterval(checkOpenCV);
   }, [cvReady]);
 
+  const handleAuthentication = () => {
+    const correctCode = import.meta.env.VITE_ACCESS_CODE || 'LUNG2024';
+    if (accessCode === correctCode) {
+      setIsAuthenticated(true);
+      setAuthError('');
+      loadLungPairs();
+    } else {
+      setAuthError('❌ Código de acceso incorrecto');
+    }
+  };
+
+  const loadLungPairs = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('lung_pairs')
+        .select('id, name, rgb_thumb_path, thermal_thumb_path, min_temp, max_temp');
+      
+      if (error) throw error;
+      
+      // Ordenamiento natural (1, 2, 10 en vez de 1, 10, 2)
+      const sortedData = data.sort((a, b) => {
+        return a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        });
+      });
+      
+      setLungPairs(sortedData);
+      setMessage(`✅ ${sortedData.length} pares de pulmones cargados.`);
+    } catch (error) {
+      console.error('Error cargando pares:', error);
+      setMessage('❌ Error cargando datos de Supabase.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSelectedPair = async (pairId) => {
+    const pair = lungPairs.find(p => p.id === pairId);
+    if (!pair) return;
+
+    setLoading(true);
+    setMessage('🔄 Cargando imágenes...');
+    setSelectedPair(pair);
+    setRgbPoints([]);
+    setThermalPoints([]);
+    setRegisteredImage(null);
+
+    try {
+      const rgbUrl = getPublicUrl('thumbnails-rgb', pair.rgb_thumb_path);
+      const thermalUrl = getPublicUrl('thumbnails-thermal', pair.thermal_thumb_path);
+
+      const rgbImg = new Image();
+      rgbImg.crossOrigin = 'anonymous';
+      rgbImg.onload = () => setRgbImage(rgbImg);
+      rgbImg.onerror = () => setMessage('❌ Error cargando imagen RGB');
+      rgbImg.src = rgbUrl;
+
+      const thermalImg = new Image();
+      thermalImg.crossOrigin = 'anonymous';
+      thermalImg.onload = () => {
+        setThermalImage(thermalImg);
+        setMessage(`✅ Imágenes cargadas: ${pair.name}`);
+        setLoading(false);
+      };
+      thermalImg.onerror = () => {
+        setMessage('❌ Error cargando imagen térmica');
+        setLoading(false);
+      };
+      thermalImg.src = thermalUrl;
+    } catch (error) {
+      console.error('Error cargando imágenes:', error);
+      setMessage('❌ Error cargando imágenes.');
+      setLoading(false);
+    }
+  };
+
   const getScaledDimensions = (img) => {
     if (!img) return { width: 0, height: 0, scale: 1 };
     let width = img.width;
@@ -54,29 +139,6 @@ const TPSImageRegistration = () => {
       height: Math.floor(height * scale),
       scale: scale
     };
-  };
-
-  const handleImageUpload = (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        if (type === 'rgb') {
-          setRgbImage(img);
-          setRgbPoints([]);
-          setMessage('Imagen RGB cargada. Haz clic para marcar puntos.');
-        } else {
-          setThermalImage(img);
-          setThermalPoints([]);
-          setMessage('Imagen Térmica cargada. Haz clic para marcar puntos.');
-        }
-        setRegisteredImage(null);
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
   };
 
   const drawImageWithPoints = (canvas, image, points, color) => {
@@ -205,7 +267,6 @@ const TPSImageRegistration = () => {
       tempCtx.drawImage(thermalImage, 0, 0, rgbDimensions.width, rgbDimensions.height);
       const src = cv.imread(tempCanvas);
       const dst = new cv.Mat();
-      // Calcular la escala aplicada a la imagen térmica cuando se dibuja en el canvas RGB
       const thermalScaleX = rgbDimensions.width / thermalImage.width;
       const thermalScaleY = rgbDimensions.height / thermalImage.height;
       const thermalScaleApplied = Math.min(thermalScaleX, thermalScaleY);
@@ -326,6 +387,48 @@ const TPSImageRegistration = () => {
     return resultCanvas;
   };
 
+  const saveRegistration = async () => {
+    if (!selectedPair || rgbPoints.length < 4 || thermalPoints.length < 4) {
+      setMessage('❌ Necesitas completar el registro antes de guardar.');
+      return;
+    }
+
+    setLoading(true);
+    setMessage('💾 Guardando registro...');
+
+    try {
+      const normalizedRgbPoints = rgbPoints.map(p => ({
+        x: p.x / rgbImage.width,
+        y: p.y / rgbImage.height
+      }));
+
+      const normalizedThermalPoints = thermalPoints.map(p => ({
+        x: p.x / thermalImage.width,
+        y: p.y / thermalImage.height
+      }));
+
+      const { data, error } = await supabase
+        .from('user_registrations')
+        .insert({
+          lung_pair_id: selectedPair.id,
+          user_code: accessCode,
+          rgb_points: normalizedRgbPoints,
+          thermal_points: normalizedThermalPoints,
+          status: 'pending'
+        })
+        .select();
+
+      if (error) throw error;
+
+      setMessage('✅ Registro guardado exitosamente! ID: ' + data[0].id);
+    } catch (error) {
+      console.error('Error guardando:', error);
+      setMessage('❌ Error guardando registro: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (resultCanvasRef.current && rgbImage) {
       const canvas = resultCanvasRef.current;
@@ -365,11 +468,48 @@ const TPSImageRegistration = () => {
   const handleDownload = () => {
     if (!resultCanvasRef.current) return;
     const link = document.createElement('a');
-    link.download = 'registered_image.png';
+    link.download = `${selectedPair?.name || 'registered'}_result.png`;
     link.href = resultCanvasRef.current.toDataURL();
     link.click();
     setMessage('✅ Imagen descargada!');
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md w-full">
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-purple-500 rounded-full flex items-center justify-center">
+              <Lock className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white text-center mb-2">
+            Acceso Restringido
+          </h1>
+          <p className="text-purple-200 text-center mb-6">
+            Ingresa el código de acceso para continuar
+          </p>
+          <input
+            type="password"
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleAuthentication()}
+            placeholder="Código de acceso"
+            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          {authError && (
+            <p className="text-red-400 text-sm mb-4">{authError}</p>
+          )}
+          <button
+            onClick={handleAuthentication}
+            className="w-full py-3 bg-gradient-to-r from-green-500 to-purple-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+          >
+            Ingresar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
@@ -390,6 +530,23 @@ const TPSImageRegistration = () => {
           </div>
         </div>
 
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
+          <h3 className="text-white font-semibold mb-3">Selecciona un par de pulmón:</h3>
+          <select
+            value={selectedPair?.id || ''}
+            onChange={(e) => loadSelectedPair(e.target.value)}
+            disabled={loading || lungPairs.length === 0}
+            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+          >
+            <option value="" disabled>Selecciona una opción...</option>
+            {lungPairs.map(pair => (
+              <option key={pair.id} value={pair.id} className="bg-slate-800">
+                {pair.name} {pair.min_temp && `(${pair.min_temp.toFixed(1)}°C - ${pair.max_temp.toFixed(1)}°C)`}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {message && (
           <div className={`border rounded-xl p-4 mb-6 backdrop-blur ${deleteMode ? 'bg-orange-500/20 border-orange-400/30' : 'bg-blue-500/20 border-blue-400/30'}`}>
             <p className={`flex items-center gap-2 ${deleteMode ? 'text-orange-100' : 'text-blue-100'}`}>
@@ -398,23 +555,6 @@ const TPSImageRegistration = () => {
             </p>
           </div>
         )}
-
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-            <label className="flex flex-col items-center gap-3 cursor-pointer hover:bg-white/5 p-6 rounded-xl transition-all">
-              <Upload className="w-12 h-12 text-green-400" />
-              <span className="text-white font-semibold">Cargar Imagen RGB</span>
-              <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'rgb')} className="hidden" />
-            </label>
-          </div>
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-            <label className="flex flex-col items-center gap-3 cursor-pointer hover:bg-white/5 p-6 rounded-xl transition-all">
-              <Upload className="w-12 h-12 text-purple-400" />
-              <span className="text-white font-semibold">Cargar Imagen Térmica</span>
-              <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'thermal')} className="hidden" />
-            </label>
-          </div>
-        </div>
 
         {(rgbImage || thermalImage) && (
           <div className="grid md:grid-cols-2 gap-6 mb-6">
@@ -490,20 +630,30 @@ const TPSImageRegistration = () => {
                 {showPoints ? 'Ocultar' : 'Mostrar'} Puntos
               </button>
               {registeredImage && (
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-500/20 text-green-300 rounded-xl font-semibold hover:bg-green-500/30 transition-all border border-green-400/30"
-                >
-                  <Download className="w-5 h-5" />
-                  Descargar Resultado
-                </button>
+                <>
+                  <button
+                    onClick={saveRegistration}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-6 py-3 bg-green-500/20 text-green-300 rounded-xl font-semibold hover:bg-green-500/30 transition-all border border-green-400/30 disabled:opacity-50"
+                  >
+                    <Check className="w-5 h-5" />
+                    {loading ? 'Guardando...' : 'Guardar Registro'}
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-2 px-6 py-3 bg-blue-500/20 text-blue-300 rounded-xl font-semibold hover:bg-blue-500/30 transition-all border border-blue-400/30"
+                  >
+                    <Download className="w-5 h-5" />
+                    Descargar Resultado
+                  </button>
+                </>
               )}
             </div>
           </div>
         )}
 
         {registeredImage && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl px-6 pt-4 pb-0 border border-white/20">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl px-6 pt-4 pb-0 border border-white/20 mb-6">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-white font-semibold text-lg">Resultado del Registro</h3>
               <div className="flex gap-1">
@@ -531,12 +681,13 @@ const TPSImageRegistration = () => {
           </h3>
           <ol className="text-purple-200 space-y-2 list-decimal list-inside">
             <li>Espera a que OpenCV.js termine de cargar (indicador verde arriba)</li>
-            <li>Carga una imagen RGB y una imagen Térmica del mismo objeto</li>
+            <li>Selecciona un par de pulmón del menú desplegable</li>
             <li>Haz clic en puntos correspondientes en ambas imágenes (mínimo 4 cada una)</li>
             <li>Para eliminar un punto: activa "Modo: Eliminar" y haz clic cerca del punto</li>
             <li>Los puntos deben coincidir: punto 1 RGB = punto 1 Térmica, etc.</li>
             <li>Haz clic en "Aplicar Registro TPS" para deformar la imagen Térmica</li>
             <li>Usa el slider de opacidad para verificar la calidad del alineamiento</li>
+            <li>Click en "Guardar Registro" para enviar tus puntos a la base de datos</li>
           </ol>
         </div>
       </div>

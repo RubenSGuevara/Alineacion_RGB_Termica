@@ -34,3 +34,7 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+
+# Environment variables
+.env.local
+.env
