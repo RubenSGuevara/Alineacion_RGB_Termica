@@ -31,20 +31,9 @@ def create_thumbnail(image_bytes, size=(400, 600)):
         if img.mode in ('RGBA', 'LA', 'P'):
             img = img.convert('RGB')
 
-        img_ratio = img.width / img.height
-        target_ratio = size[0] / size[1]
-        
-        if img_ratio > target_ratio:
-            # La imagen es más ancha: fijamos el ancho a 400
-            new_width = size[0]
-            new_height = int(size[0] / img_ratio)
-        else:
-            # La imagen es más alta: fijamos el alto a 600
-            new_height = size[1]
-            new_width = int(size[1] * img_ratio)
-            
-        # Usamos resize() en lugar de thumbnail() para forzar el tamaño
-        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Usamos img.resize directamente con el tamaño objetivo (size).
+        # Esto ignora el aspect ratio original y estira la imagen para llenar 400x600,
+        img = img.resize(size, Image.Resampling.LANCZOS)
         
         buffer = BytesIO()
         img.save(buffer, 'PNG', optimize=True)
