@@ -114,11 +114,11 @@ class handler(BaseHTTPRequestHandler):
                 "min_temp": temp_metadata['min_temp'],
                 "max_temp": temp_metadata['max_temp'],
                 "mean_temp": temp_metadata['mean_temp'],
-                "metadata": { "processed_via": "vercel_function_v2" }
+                "metadata": { "processed_via": "vercel_function_upsert" }
             }
             
-            # Ejecutar inserción
-            response = supabase.table("lung_pairs").insert(db_row).execute()
+            # on_conflict="name" le dice a la BD: "Si el nombre ya existe, actualiza los otros campos"
+            response = supabase.table("lung_pairs").upsert(db_row, on_conflict="name").execute()
             
             # Si llegamos aquí, fue exitoso
             print(f"Inserción exitosa: {response.data}")
