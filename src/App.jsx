@@ -4,10 +4,11 @@ import { Lock } from 'lucide-react';
 // 1. Importa las dos vistas que acabamos de organizar
 import UserView from './UserView';
 import AdminDashboard from './AdminDashboard';
+import UploadView from './UploadView';
 
 function App() {
   // Estado para saber qué vista mostrar
-  const [view, setView] = useState('login'); // 'login', 'user', 'admin'
+  const [view, setView] = useState('login'); // 'login', 'user', 'admin', 'upload'
 
   // Estado para el login
   const [accessCode, setAccessCode] = useState('');
@@ -15,8 +16,9 @@ function App() {
 
   const handleAuthentication = () => {
     // Lee los códigos de las variables de entorno
-    const userCode = import.meta.env.VITE_ACCESS_CODE || 'LUNG2024';
-    const adminCode = import.meta.env.VITE_ADMIN_CODE || 'ADMINPULMONES';
+    const userCode = import.meta.env.VITE_ACCESS_CODE;
+    const adminCode = import.meta.env.VITE_ADMIN_CODE;
+    const uploadCode = import.meta.env.VITE_UPLOAD_CODE;
 
     if (accessCode === userCode) {
       setView('user'); // Mostrar vista de usuario
@@ -24,7 +26,11 @@ function App() {
     } else if (accessCode === adminCode) {
       setView('admin'); // Mostrar vista de admin
       setAuthError('');
-    } else {
+    }else if (accessCode === uploadCode) {
+      setView('upload'); // Mostrar vista de upload
+      setAuthError('');
+    }
+    else {
       setAuthError('❌ Código de acceso incorrecto');
     }
   };
@@ -79,6 +85,11 @@ function App() {
   if (view === 'admin') {
     // Pasa el código de acceso por si lo necesitas
     return <AdminDashboard accessCode={accessCode} />;
+  }
+
+  if (view === 'upload') {
+    // Pasa el código de acceso por si lo necesitas
+    return <UploadView accessCode={accessCode} />;
   }
 }
 
