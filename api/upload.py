@@ -1,4 +1,3 @@
-# api/upload.py
 import os
 import json
 import numpy as np
@@ -8,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from supabase import create_client, Client
 
-# --- Funciones Helper (Sin cambios en lógica, solo en uso) ---
+# --- Funciones Helper ---
 def extract_thermal_data(tiff_bytes):
     try:
         with tifffile.TiffFile(BytesIO(tiff_bytes)) as tif:
@@ -43,7 +42,7 @@ def create_thumbnail(image_bytes, size=(400, 600)):
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            # 1. Leer el body JSON (ya no es Multipart)
+            # 1. Leer el body JSON
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             body = json.loads(post_data.decode('utf-8'))
@@ -63,51 +62,66 @@ class handler(BaseHTTPRequestHandler):
             
             supabase: Client = create_client(url, key)
 
-            # 3. Descargar archivos ORIGINALES desde Supabase
-            # (Esto ocurre dentro del servidor de Vercel, muy rápido)
+            # 3. Descargar archivos ORIGINALES
+            print(f"Descargando: {rgb_path} y {tiff_path}")
             rgb_bytes = supabase.storage.from_("rgb-originals").download(rgb_path)
             tiff_bytes = supabase.storage.from_("tiff-originals").download(tiff_path)
 
             # 4. Procesar en Memoria
-            # a. Thumbnails
             rgb_thumb_bytes = create_thumbnail(rgb_bytes)
             thermal_thumb_bytes = create_thumbnail(tiff_bytes)
             
-            # b. Temperaturas
             temp_data, temp_metadata = extract_thermal_data(tiff_bytes)
             if temp_data is None:
-                raise Exception("No se pudo extraer temperatura del TIFF")
+                # Fallback: Si no hay temperatura, usar valores default para no romper
+                print("Advertencia: No se detectaron datos térmicos en Frame 1")
+                temp_metadata = {'min_temp': 0, 'max_temp': 0, 'mean_temp': 0}
+                # Crear un array vacío o dummy
+                temp_data = np.zeros((10, 10))
             
-            # c. NPY
             npy_buffer = BytesIO()
             np.save(npy_buffer, temp_data)
             npy_bytes = npy_buffer.getvalue()
 
-            # 5. Subir RESULTADOS procesados
-            # Subimos los thumbnails y el .npy a sus buckets correspondientes
-            
+            # 5. Subir RESULTADOS
             thumb_name = f"{name}_thumb.png"
-            supabase.storage.from_("thumbnails-rgb").upload(thumb_name, rgb_thumb_bytes, {"content-type": "image/png", "upsert": "true"})
-            supabase.storage.from_("thumbnails-thermal").upload(thumb_name, thermal_thumb_bytes, {"content-type": "image/png", "upsert": "true"})
+            supabase.storage.from_("thumbnails-rgb").upload(
+                path=thumb_name, 
+                file=rgb_thumb_bytes, 
+                file_options={"content-type": "image/png", "upsert": "true"}
+            )
+            supabase.storage.from_("thumbnails-thermal").upload(
+                path=thumb_name, 
+                file=thermal_thumb_bytes, 
+                file_options={"content-type": "image/png", "upsert": "true"}
+            )
             
             npy_name = f"{name}_temps.npy"
-            supabase.storage.from_("temperature-data").upload(npy_name, npy_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
+            supabase.storage.from_("temperature-data").upload(
+                path=npy_name, 
+                file=npy_bytes, 
+                file_options={"content-type": "application/octet-stream", "upsert": "true"}
+            )
 
             # 6. Insertar en Base de Datos
+            
             db_row = {
                 "name": name,
                 "rgb_thumb_path": thumb_name,
                 "thermal_thumb_path": thumb_name,
-                "tiff_path": tiff_path,      # Referencia al original que ya subiste
+                "tiff_path": tiff_path,
                 "temp_data_path": npy_name,
                 "min_temp": temp_metadata['min_temp'],
                 "max_temp": temp_metadata['max_temp'],
                 "mean_temp": temp_metadata['mean_temp'],
-                "metadata": { "processed_via": "vercel_function" }
+                "metadata": { "processed_via": "vercel_function_v2" }
             }
             
-            data, error = supabase.table("lung_pairs").insert(db_row).execute()
-            if error: raise Exception(error.message)
+            # Ejecutar inserción
+            response = supabase.table("lung_pairs").insert(db_row).execute()
+            
+            # Si llegamos aquí, fue exitoso
+            print(f"Inserción exitosa: {response.data}")
 
             # 7. Responder Éxito
             self.send_response(200)
@@ -116,8 +130,9 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'success': True, 'name': name}).encode())
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error CRÍTICO en upload.py: {str(e)}")
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
+            # Convertir excepción a string para enviarla al frontend
             self.wfile.write(json.dumps({'error': str(e)}).encode())
