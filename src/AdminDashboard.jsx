@@ -1,7 +1,9 @@
-// src/AdminDashboard.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, EyeOff, Info, Check, X, Star, Archive, Database } from 'lucide-react';
+import { Eye, EyeOff, Info, Check, X, Star, Archive, Database, Upload, ArrowLeft } from 'lucide-react';
 import { supabase, getPublicUrl } from './lib/supabase';
+
+// Importamos el componente UploadView
+import UploadView from './UploadView';
 
 const MAX_CANVAS_WIDTH = 800;
 const MAX_CANVAS_HEIGHT = 600;
@@ -117,6 +119,10 @@ const applyTPSWarping = (cv, sourceCanvas, srcPoints, dstPoints, width, height) 
 // ------------------------------------------------------------------
 
 const AdminDashboard = ({ accessCode }) => {
+
+  // 1. NUEVO ESTADO PARA CONTROLAR LA VISTA
+  const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' | 'upload'
+
   // --- ESTADOS DE PENDIENTES ---
   const [registrations, setRegistrations] = useState([]);
   const [selectedReg, setSelectedReg] = useState(null);
@@ -417,11 +423,31 @@ const AdminDashboard = ({ accessCode }) => {
   };
 
   // --- RENDERIZADO ---
-
+  // --- 2. RENDERIZADO CONDICIONAL DE UPLOAD ---
+  if (viewMode === 'upload') {
+    return (
+      <div className="relative">
+        {/* Botón flotante para regresar */}
+        <div className="absolute top-6 right-6 z-50">
+          <button 
+            onClick={() => setViewMode('dashboard')}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 shadow-lg border border-white/20 transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" /> Volver a Revisiones
+          </button>
+        </div>
+        {/* Renderizamos el componente de carga */}
+        <UploadView accessCode={accessCode} />
+      </div>
+    );
+  }
+    // ...
+  // Renderizado del Dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-800 via-gray-900 to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
+        {/* Agregamos 'flex justify-between items-start' para poner el botón a la derecha */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20 flex justify-between items-start">
           <h1 className="text-4xl font-bold text-white mb-2">Panel de Revisión</h1>
           <p className="text-purple-200">Administración de alineaciones pendientes y aprobadas</p>
           <div className="mt-2 flex items-center gap-2">
@@ -429,6 +455,15 @@ const AdminDashboard = ({ accessCode }) => {
             <span className="text-sm text-purple-300">{cvReady ? 'OpenCV.js: Listo' : 'OpenCV.js: Cargando...'}</span>
           </div>
         </div>
+
+        {/* 3. BOTÓN NUEVO PARA IR A SUBIR */}
+        <button 
+            onClick={() => setViewMode('upload')}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all border border-white/20"
+          >
+            <Upload className="w-5 h-5" />
+            Subir Imágenes
+          </button>
 
         {/* ---------------- SECCIÓN DE PENDIENTES ---------------- */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">

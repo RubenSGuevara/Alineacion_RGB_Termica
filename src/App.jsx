@@ -86,11 +86,6 @@ function App() {
     // Pasa el código de acceso por si lo necesitas
     return <AdminDashboard accessCode={accessCode} />;
   }
-
-  if (view === 'upload') {
-    // Pasa el código de acceso por si lo necesitas
-    return <UploadView accessCode={accessCode} />;
-  }
 }
 
 export default App;
