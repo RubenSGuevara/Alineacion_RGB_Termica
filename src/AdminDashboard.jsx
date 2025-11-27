@@ -423,38 +423,66 @@ const AdminDashboard = ({ accessCode }) => {
   };
 
   // Función para descargar todos los datos verificados
+  // Función ROBUSTA para descargar datos masivos (Paginación automática)
   const handleExportData = async () => {
     try {
       setLoading(true);
-      setMessage('📦 Generando archivo de exportación...');
+      setMessage('📦 Iniciando exportación masiva...');
 
-      // 1. Obtener todos los datos verificados
-      const { data, error } = await supabase
-        .from('verified_alignments')
-        .select(`
-          id, approved_at, 
-          original_user_code, original_quality_score, reviewer_notes,
-          rgb_points, thermal_points,
-          lung_pairs ( name, min_temp, max_temp, mean_temp )
-        `);
+      let allRows = [];
+      let page = 0;
+      const PAGE_SIZE = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      // Bucle para descargar por partes (Chunks)
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        
+        // Feedback visual para el usuario
+        setMessage(`📦 Descargando registros ${from + 1} - ${to + 1}...`);
 
-      // 2. Crear archivo JSON
+        const { data, error } = await supabase
+          .from('verified_alignments')
+          .select(`
+            id, approved_at, 
+            original_user_code, original_quality_score, reviewer_notes,
+            rgb_points, thermal_points,
+            lung_pairs ( name, min_temp, max_temp, mean_temp )
+          `)
+          .range(from, to) // <--- Aquí está la magia de la paginación
+          .order('approved_at', { ascending: true }); // Orden consistente es vital para paginar
+
+        if (error) throw error;
+
+        // Añadir el bloque actual a la lista maestra
+        allRows = [...allRows, ...data];
+
+        // Si recibimos menos filas que el límite, es la última página
+        if (data.length < PAGE_SIZE) {
+          hasMore = false;
+        }
+        page++;
+      }
+
+      setMessage('📦 Generando archivo JSON...');
+
+      // 2. Crear archivo JSON con la lista completa
       const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
-        JSON.stringify(data, null, 2)
+        JSON.stringify(allRows, null, 2)
       )}`;
       
       // 3. Disparar descarga
       const link = document.createElement('a');
       link.href = jsonString;
-      link.download = `dataset_pulmones_verificados_${new Date().toISOString().slice(0,10)}.json`;
+      link.download = `dataset_completo_${new Date().toISOString().slice(0,10)}_(${allRows.length}_registros).json`;
       link.click();
 
-      setMessage(`✅ Exportación completada: ${data.length} registros.`);
+      setMessage(`✅ Exportación exitosa: ${allRows.length} registros totales.`);
+      
     } catch (error) {
       console.error('Error exportando:', error);
-      setMessage('❌ Error al exportar datos.');
+      setMessage('❌ Error al exportar datos: ' + error.message);
     } finally {
       setLoading(false);
     }
