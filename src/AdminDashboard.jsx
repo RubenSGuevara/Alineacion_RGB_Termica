@@ -281,32 +281,66 @@ const AdminDashboard = ({ accessCode }) => {
   }, [currentView, registeredImage, rgbImage, overlayOpacity]);
 
   // Función para Aprobar o Rechazar
-  const handleUpdateStatus = async (newStatus) => {
+  // Función para Aprobar (Mover) o Rechazar (Borrar)
+  const handleUpdateStatus = async (decision) => {
     if (!selectedReg) return;
     
     setLoading(true);
-    setMessage(`Actualizando estado a: ${newStatus}...`);
+    // decision será 'approved' o 'rejected'
+    const actionText = decision === 'approved' ? 'Aprobando y Guardando' : 'Rechazando y Borrando';
+    setMessage(`⏳ ${actionText}...`);
     
     try {
-      const { error } = await supabase
-        .from('user_registrations')
-        .update({ status: newStatus })
-        .eq('id', selectedReg.id);
+      if (decision === 'rejected') {
+        // --- CASO 1: RECHAZAR (Borrar directamente) ---
+        const { error } = await supabase
+          .from('user_registrations')
+          .delete()
+          .eq('id', selectedReg.id);
+          
+        if (error) throw error;
+        setMessage('🗑️ Registro rechazado y eliminado.');
+
+      } else if (decision === 'approved') {
+        // --- CASO 2: APROBAR (Copiar a Verificados -> Borrar de Pendientes) ---
         
-      if (error) throw error;
+        // 1. Insertar en la nueva tabla 'verified_alignments'
+        const { error: insertError } = await supabase
+          .from('verified_alignments')
+          .insert({
+            lung_pair_id: selectedReg.lung_pairs.id, // ID del par
+            rgb_points: selectedReg.rgb_points,      // Puntos originales
+            thermal_points: selectedReg.thermal_points, // Puntos originales
+            original_user_code: selectedReg.user_code,  // Crédito al usuario
+            original_quality_score: selectedReg.quality_score, // Puntuación original
+            reviewer_notes: selectedReg.notes // Notas originales (o tuyas si añades un campo)
+          });
+
+        if (insertError) throw new Error(`Error al copiar: ${insertError.message}`);
+
+        // 2. Si se copió bien, borramos de la lista de pendientes (user_registrations)
+        const { error: deleteError } = await supabase
+          .from('user_registrations')
+          .delete()
+          .eq('id', selectedReg.id);
+
+        if (deleteError) throw new Error(`Copiado, pero error al limpiar pendiente: ${deleteError.message}`);
+
+        setMessage('✅ ¡Alineación verificada y guardada en base de datos final!');
+      }
       
-      setMessage(`✅ Registro ${newStatus}!`);
-      
-      // Limpiar y recargar la lista
+      // Limpieza final de la UI
       setRegisteredImage(null);
       setSelectedReg(null);
       setRgbImage(null);
       setThermalImage(null);
+      
+      // Recargar la lista (ese registro ya no debería aparecer)
       loadPendingRegistrations();
       
     } catch (error) {
-      console.error('Error actualizando estado:', error);
-      setMessage('❌ Error al actualizar: ' + error.message);
+      console.error('Error en proceso:', error);
+      setMessage('❌ Error: ' + error.message);
     } finally {
       setLoading(false);
     }
