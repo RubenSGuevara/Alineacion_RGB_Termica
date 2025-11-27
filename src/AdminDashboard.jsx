@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, EyeOff, Info, Check, X, Star, Archive, Database, Upload, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Info, Check, X, Star, Archive, Database, Upload, ArrowLeft, Download } from 'lucide-react';
 import { supabase, getPublicUrl } from './lib/supabase';
 
 // Importamos el componente UploadView
@@ -596,8 +596,7 @@ const AdminDashboard = ({ accessCode }) => {
               className="text-xs flex items-center gap-1 px-3 py-1 bg-emerald-600/50 hover:bg-emerald-500 text-white rounded border border-emerald-500/50 transition-all disabled:opacity-50"
             >
               <Download className="w-3 h-3" /> Exportar JSON
-            </button>
-          
+          </button>
 
           <select
             value={selectedVerified?.id || ''}
