@@ -422,6 +422,44 @@ const AdminDashboard = ({ accessCode }) => {
     }
   };
 
+  // Función para descargar todos los datos verificados
+  const handleExportData = async () => {
+    try {
+      setLoading(true);
+      setMessage('📦 Generando archivo de exportación...');
+
+      // 1. Obtener todos los datos verificados
+      const { data, error } = await supabase
+        .from('verified_alignments')
+        .select(`
+          id, approved_at, 
+          original_user_code, original_quality_score, reviewer_notes,
+          rgb_points, thermal_points,
+          lung_pairs ( name, min_temp, max_temp, mean_temp )
+        `);
+
+      if (error) throw error;
+
+      // 2. Crear archivo JSON
+      const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
+        JSON.stringify(data, null, 2)
+      )}`;
+      
+      // 3. Disparar descarga
+      const link = document.createElement('a');
+      link.href = jsonString;
+      link.download = `dataset_pulmones_verificados_${new Date().toISOString().slice(0,10)}.json`;
+      link.click();
+
+      setMessage(`✅ Exportación completada: ${data.length} registros.`);
+    } catch (error) {
+      console.error('Error exportando:', error);
+      setMessage('❌ Error al exportar datos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- RENDERIZADO ---
   // --- 2. RENDERIZADO CONDICIONAL DE UPLOAD ---
   if (viewMode === 'upload') {
@@ -550,6 +588,17 @@ const AdminDashboard = ({ accessCode }) => {
             <Database className="w-5 h-5 text-emerald-400" />
             2. Registros Aprobados ({verifiedList.length})
           </h3>
+
+          {/* BOTÓN DE EXPORTAR */}
+          <button
+              onClick={handleExportData}
+              disabled={loading || verifiedList.length === 0}
+              className="text-xs flex items-center gap-1 px-3 py-1 bg-emerald-600/50 hover:bg-emerald-500 text-white rounded border border-emerald-500/50 transition-all disabled:opacity-50"
+            >
+              <Download className="w-3 h-3" /> Exportar JSON
+            </button>
+          
+
           <select
             value={selectedVerified?.id || ''}
             onChange={(e) => loadVerifiedDetails(e.target.value)}
