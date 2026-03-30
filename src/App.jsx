@@ -1,44 +1,35 @@
 import React, { useState } from 'react';
 import { Lock } from 'lucide-react';
 
-// 1. Importa las dos vistas que acabamos de organizar
 import UserView from './UserView';
 import AdminDashboard from './AdminDashboard';
 import UploadView from './UploadView';
 
 function App() {
-  // Estado para saber qué vista mostrar
-  const [view, setView] = useState('login'); // 'login', 'user', 'admin', 'upload'
-
-  // Estado para el login
+  const [view, setView] = useState('login'); 
   const [accessCode, setAccessCode] = useState('');
   const [authError, setAuthError] = useState('');
 
   const handleAuthentication = () => {
-    // Lee los códigos de las variables de entorno
     const userCode = import.meta.env.VITE_ACCESS_CODE;
     const adminCode = import.meta.env.VITE_ADMIN_CODE;
     const uploadCode = import.meta.env.VITE_UPLOAD_CODE;
 
     if (accessCode === userCode) {
-      setView('user'); // Mostrar vista de usuario
+      setView('user'); 
       setAuthError('');
     } else if (accessCode === adminCode) {
-      setView('admin'); // Mostrar vista de admin
+      setView('admin'); 
       setAuthError('');
-    }else if (accessCode === uploadCode) {
-      setView('upload'); // Mostrar vista de upload
+    } else if (accessCode === uploadCode) {
+      setView('upload'); 
       setAuthError('');
-    }
-    else {
+    } else {
       setAuthError('❌ Código de acceso incorrecto');
     }
   };
 
-  // VISTA DE LOGIN
-  // Esta es la primera pantalla que todos verán
   if (view === 'login') {
-    // (Esta es tu UI de login, copiada de tu componente original)
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md w-full">
@@ -75,16 +66,16 @@ function App() {
     );
   }
 
-  // VISTA DE USUARIO
   if (view === 'user') {
-    // Pasa el código de acceso para que sepa quién está guardando
     return <UserView accessCode={accessCode} />;
   }
 
-  // VISTA DE ADMIN
   if (view === 'admin') {
-    // Pasa el código de acceso por si lo necesitas
     return <AdminDashboard accessCode={accessCode} />;
+  }
+  
+  if (view === 'upload') {
+    return <UploadView accessCode={accessCode} />;
   }
 }
 

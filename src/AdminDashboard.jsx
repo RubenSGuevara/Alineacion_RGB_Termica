@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Eye, EyeOff, Info, Check, X, Star, Archive, Database, Upload, ArrowLeft, Download } from 'lucide-react';
 import { supabase, getPublicUrl } from './lib/supabase';
-
-// Importamos el componente UploadView
 import UploadView from './UploadView';
 
 const MAX_CANVAS_WIDTH = 800;
@@ -114,24 +112,13 @@ const applyTPSWarping = (cv, sourceCanvas, srcPoints, dstPoints, width, height) 
   return resultCanvas;
 };
 
-// ------------------------------------------------------------------
-// --- COMPONENTE PRINCIPAL ---
-// ------------------------------------------------------------------
-
 const AdminDashboard = ({ accessCode }) => {
-
-  // 1. NUEVO ESTADO PARA CONTROLAR LA VISTA
-  const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' | 'upload'
-
-  // --- ESTADOS DE PENDIENTES ---
+  const [viewMode, setViewMode] = useState('dashboard');
   const [registrations, setRegistrations] = useState([]);
   const [selectedReg, setSelectedReg] = useState(null);
-  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [cvReady, setCvReady] = useState(false);
-
-  // Estados para el visor PENDIENTE
   const [rgbImage, setRgbImage] = useState(null);
   const [thermalImage, setThermalImage] = useState(null);
   const [registeredImage, setRegisteredImage] = useState(null);
@@ -139,10 +126,8 @@ const AdminDashboard = ({ accessCode }) => {
   const [overlayOpacity, setOverlayOpacity] = useState(0.5);
   const resultCanvasRef = useRef(null);
 
-  // --- ESTADOS DE VERIFICADOS (NUEVO) ---
   const [verifiedList, setVerifiedList] = useState([]);
   const [selectedVerified, setSelectedVerified] = useState(null);
-  // Visor VERIFICADO (Independiente)
   const [verRgbImage, setVerRgbImage] = useState(null);
   const [verThermalImage, setVerThermalImage] = useState(null);
   const [verRegisteredImage, setVerRegisteredImage] = useState(null);
@@ -150,7 +135,6 @@ const AdminDashboard = ({ accessCode }) => {
   const [verOpacity, setVerOpacity] = useState(0.5);
   const verifiedCanvasRef = useRef(null);
 
-  // Cargar OpenCV
   useEffect(() => {
     const checkOpenCV = setInterval(() => {
       if (window.cv && window.cv.Mat) {
@@ -162,13 +146,10 @@ const AdminDashboard = ({ accessCode }) => {
     return () => clearInterval(checkOpenCV);
   }, []);
 
-  // Cargar listas iniciales
   useEffect(() => {
     loadPendingRegistrations();
-    loadVerifiedRegistrations(); // <-- Cargamos también los verificados
+    loadVerifiedRegistrations();
   }, []);
-
-  // --- 1. LÓGICA DE PENDIENTES ---
 
   const loadPendingRegistrations = async () => {
     setLoading(true);
@@ -203,7 +184,6 @@ const AdminDashboard = ({ accessCode }) => {
     setRegisteredImage(null);
 
     try {
-      // Cargar imágenes base
       const rgbUrl = getPublicUrl('thumbnails-rgb', reg.lung_pairs.rgb_thumb_path);
       const thermalUrl = getPublicUrl('thumbnails-thermal', reg.lung_pairs.thermal_thumb_path);
       
@@ -215,7 +195,6 @@ const AdminDashboard = ({ accessCode }) => {
       setRgbImage(rgbImg);
       setThermalImage(thermalImg);
 
-      // Aplicar TPS
       if (!cvReady) {
         setMessage('❌ OpenCV no está listo.');
         setLoading(false);
@@ -233,8 +212,6 @@ const AdminDashboard = ({ accessCode }) => {
     }
   };
 
-  // --- 2. LÓGICA DE VERIFICADOS (NUEVA) ---
-
   const loadVerifiedRegistrations = async () => {
     try {
       const { data, error } = await supabase
@@ -243,7 +220,7 @@ const AdminDashboard = ({ accessCode }) => {
           id, approved_at, original_quality_score, reviewer_notes,
           lung_pairs ( id, name, rgb_thumb_path, thermal_thumb_path )
         `)
-        .order('approved_at', { ascending: false }); // Los más recientes primero
+        .order('approved_at', { ascending: false });
 
       if (error) throw error;
       setVerifiedList(data);
@@ -256,14 +233,12 @@ const AdminDashboard = ({ accessCode }) => {
     const ver = verifiedList.find(v => v.id === verId);
     if (!ver) return;
 
-    setLoading(true); // Usamos el mismo loading global
+    setLoading(true);
     setMessage('🔄 Cargando registro histórico...');
     setSelectedVerified(ver);
     setVerRegisteredImage(null);
 
     try {
-      // Necesitamos fetchear los puntos de la tabla verified_alignments
-      // (el select de arriba ya debería traerlos si incluimos las columnas, vamos a ajustarlo)
       const { data: fullVer, error } = await supabase
         .from('verified_alignments')
         .select('*')
@@ -272,7 +247,6 @@ const AdminDashboard = ({ accessCode }) => {
         
       if (error) throw error;
 
-      // Cargar imágenes
       const rgbUrl = getPublicUrl('thumbnails-rgb', ver.lung_pairs.rgb_thumb_path);
       const thermalUrl = getPublicUrl('thumbnails-thermal', ver.lung_pairs.thermal_thumb_path);
       
@@ -284,9 +258,7 @@ const AdminDashboard = ({ accessCode }) => {
       setVerRgbImage(rgbImg);
       setVerThermalImage(thermalImg);
 
-      // Aplicar TPS (reusamos la lógica)
       if (cvReady) {
-        // Usamos los puntos guardados en la tabla verified
         await processTPS({
           rgb_points: fullVer.rgb_points,
           thermal_points: fullVer.thermal_points
@@ -303,8 +275,6 @@ const AdminDashboard = ({ accessCode }) => {
     }
   };
 
-  // --- 3. HELPER FUNCTIONS COMUNES ---
-
   const loadImage = (src) => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -315,7 +285,6 @@ const AdminDashboard = ({ accessCode }) => {
     });
   };
 
-  // Función TPS genérica para usar en ambos visores
   const processTPS = async (dataPoints, rgbImg, thermalImg, setImageSetter) => {
     const cv = window.cv;
     const rgbDimensions = getScaledDimensions(rgbImg);
@@ -346,14 +315,10 @@ const AdminDashboard = ({ accessCode }) => {
     img.src = warpedCanvas.toDataURL();
   };
 
-  // --- 4. USE EFFECTS PARA DIBUJAR ---
-
-  // Canvas Pendiente
   useEffect(() => {
     drawCanvas(resultCanvasRef, currentView, registeredImage, rgbImage, overlayOpacity);
   }, [currentView, registeredImage, rgbImage, overlayOpacity]);
 
-  // Canvas Verificado (NUEVO)
   useEffect(() => {
     drawCanvas(verifiedCanvasRef, verView, verRegisteredImage, verRgbImage, verOpacity);
   }, [verView, verRegisteredImage, verRgbImage, verOpacity]);
@@ -380,8 +345,6 @@ const AdminDashboard = ({ accessCode }) => {
     }
   };
 
-  // --- ACCIONES ---
-
   const handleUpdateStatus = async (decision) => {
     if (!selectedReg) return;
     setLoading(true);
@@ -403,8 +366,6 @@ const AdminDashboard = ({ accessCode }) => {
           });
         await supabase.from('user_registrations').delete().eq('id', selectedReg.id);
         setMessage('✅ ¡Alineación verificada y guardada!');
-        
-        // Recargar lista de verificados
         loadVerifiedRegistrations();
       }
       
@@ -422,8 +383,6 @@ const AdminDashboard = ({ accessCode }) => {
     }
   };
 
-  // Función para descargar todos los datos verificados
-  // Función ROBUSTA para descargar datos masivos (Paginación automática)
   const handleExportData = async () => {
     try {
       setLoading(true);
@@ -434,12 +393,10 @@ const AdminDashboard = ({ accessCode }) => {
       const PAGE_SIZE = 1000;
       let hasMore = true;
 
-      // Bucle para descargar por partes (Chunks)
       while (hasMore) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
         
-        // Feedback visual para el usuario
         setMessage(`📦 Descargando registros ${from + 1} - ${to + 1}...`);
 
         const { data, error } = await supabase
@@ -450,15 +407,13 @@ const AdminDashboard = ({ accessCode }) => {
             rgb_points, thermal_points,
             lung_pairs ( name, min_temp, max_temp, mean_temp )
           `)
-          .range(from, to) // <--- Aquí está la magia de la paginación
-          .order('approved_at', { ascending: true }); // Orden consistente es vital para paginar
+          .range(from, to)
+          .order('approved_at', { ascending: true });
 
         if (error) throw error;
 
-        // Añadir el bloque actual a la lista maestra
         allRows = [...allRows, ...data];
 
-        // Si recibimos menos filas que el límite, es la última página
         if (data.length < PAGE_SIZE) {
           hasMore = false;
         }
@@ -467,12 +422,10 @@ const AdminDashboard = ({ accessCode }) => {
 
       setMessage('📦 Generando archivo JSON...');
 
-      // 2. Crear archivo JSON con la lista completa
       const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
         JSON.stringify(allRows, null, 2)
       )}`;
       
-      // 3. Disparar descarga
       const link = document.createElement('a');
       link.href = jsonString;
       link.download = `dataset_completo_${new Date().toISOString().slice(0,10)}_(${allRows.length}_registros).json`;
@@ -488,12 +441,9 @@ const AdminDashboard = ({ accessCode }) => {
     }
   };
 
-  // --- RENDERIZADO ---
-  // --- 2. RENDERIZADO CONDICIONAL DE UPLOAD ---
   if (viewMode === 'upload') {
     return (
       <div className="relative">
-        {/* Botón flotante para regresar */}
         <div className="absolute top-6 right-6 z-50">
           <button 
             onClick={() => setViewMode('dashboard')}
@@ -502,17 +452,14 @@ const AdminDashboard = ({ accessCode }) => {
             <ArrowLeft className="w-4 h-4" /> Volver a Revisiones
           </button>
         </div>
-        {/* Renderizamos el componente de carga */}
         <UploadView accessCode={accessCode} />
       </div>
     );
   }
-    // ...
-  // Renderizado del Dashboard
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-800 via-gray-900 to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Agregamos 'flex justify-between items-start' para poner el botón a la derecha */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20 flex justify-between items-start">
           <h1 className="text-4xl font-bold text-white mb-2">Panel de Revisión</h1>
           <p className="text-purple-200">Administración de alineaciones pendientes y aprobadas</p>
@@ -522,7 +469,6 @@ const AdminDashboard = ({ accessCode }) => {
           </div>
         </div>
 
-        {/* 3. BOTÓN NUEVO PARA IR A SUBIR */}
         <button 
             onClick={() => setViewMode('upload')}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all border border-white/20"
@@ -531,7 +477,6 @@ const AdminDashboard = ({ accessCode }) => {
             Subir Imágenes
           </button>
 
-        {/* ---------------- SECCIÓN DE PENDIENTES ---------------- */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
           <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
             <Eye className="w-5 h-5 text-yellow-400" />
@@ -563,7 +508,6 @@ const AdminDashboard = ({ accessCode }) => {
           </div>
         )}
 
-        {/* VISOR PENDIENTE */}
         {registeredImage && selectedReg && (
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl px-6 pt-4 pb-0 border border-yellow-500/30 mb-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
@@ -585,7 +529,6 @@ const AdminDashboard = ({ accessCode }) => {
               <canvas ref={resultCanvasRef} className="w-full h-auto rounded-lg border-2 border-yellow-500/30" />
             </div>
             
-            {/* BOTONES DE ACCIÓN */}
             <div className="mt-8 mb-6 p-4 bg-black/20 rounded-xl border border-white/10">
               <div className="mb-4">
                 <p className="text-purple-200 text-sm">Calificación: <span className="text-yellow-400 font-bold ml-1">{'★'.repeat(selectedReg.quality_score)}</span></p>
@@ -603,21 +546,18 @@ const AdminDashboard = ({ accessCode }) => {
           </div>
         )}
 
-        {/* DIVISOR */}
         <div className="my-12 border-t border-white/10 relative">
           <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-slate-800 px-4 text-white/30 text-sm uppercase tracking-widest">
             Historial de Verificaciones
           </div>
         </div>
 
-        {/* ---------------- SECCIÓN DE VERIFICADOS (NUEVA) ---------------- */}
         <div className="bg-emerald-900/20 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-emerald-500/30">
           <h3 className="text-emerald-100 font-semibold mb-3 flex items-center gap-2">
             <Database className="w-5 h-5 text-emerald-400" />
             2. Registros Aprobados ({verifiedList.length})
           </h3>
 
-          {/* BOTÓN DE EXPORTAR */}
           <button
               onClick={handleExportData}
               disabled={loading || verifiedList.length === 0}
@@ -643,7 +583,6 @@ const AdminDashboard = ({ accessCode }) => {
           </select>
         </div>
 
-        {/* VISOR VERIFICADO */}
         {verRegisteredImage && selectedVerified && (
           <div className="bg-emerald-900/10 backdrop-blur-lg rounded-2xl px-6 pt-4 pb-6 border border-emerald-500/30 mb-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>

@@ -1,7 +1,6 @@
-// src/UploadView.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Info, AlertCircle, FileImage, FileText } from 'lucide-react';
-import { supabase } from './lib/supabase'; // Importamos el cliente
+import { supabase } from './lib/supabase';
 
 const UploadView = ({ accessCode }) => {
   const [name, setName] = useState('');
@@ -53,15 +52,13 @@ const UploadView = ({ accessCode }) => {
     setMessage('⏳ Subiendo imágenes a Supabase...');
 
     try {
-      // 1. Subir RGB Original directamente a Supabase
-      const rgbPath = `${name}.png`; // O la extensión que sea
+      const rgbPath = `${name}.png`; 
       const { error: rgbError } = await supabase.storage
         .from('rgb-originals')
         .upload(rgbPath, rgbFile, { upsert: true });
 
       if (rgbError) throw new Error(`Error subiendo RGB: ${rgbError.message}`);
 
-      // 2. Subir TIFF Original directamente a Supabase
       const tiffPath = `${name}.tiff`;
       const { error: tiffError } = await supabase.storage
         .from('tiff-originals')
@@ -69,7 +66,6 @@ const UploadView = ({ accessCode }) => {
 
       if (tiffError) throw new Error(`Error subiendo TIFF: ${tiffError.message}`);
 
-      // 3. Llamar al Backend para procesar (Solo enviamos las rutas)
       setMessage('⚙️ Procesando imágenes en el servidor...');
       
       const response = await fetch('/api/upload', {
